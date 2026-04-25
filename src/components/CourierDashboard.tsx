@@ -32,8 +32,38 @@ export function CourierDashboard({
       : null
   );
   const [tracking, setTracking] = useState<boolean>(false);
+  const [permDenied, setPermDenied] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+
+  function handlePosition(p: GeolocationPosition) {
+    const lat = p.coords.latitude;
+    const lng = p.coords.longitude;
+    setPos({ lat, lng });
+    fetch("/api/courier/location", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lat, lng }),
+    }).catch(() => {});
+  }
+
+  function handleError(err: GeolocationPositionError) {
+    if (err.code === 1) {
+      // PERMISSION_DENIED — show actionable UI instead of a tiny message.
+      setPermDenied(true);
+      setTracking(false);
+      setError(null);
+    } else if (err.code === 2) {
+      setPermDenied(false);
+      setError("موقعیت در دسترس نیست. آیا GPS دستگاه روشن است؟");
+    } else if (err.code === 3) {
+      setPermDenied(false);
+      setError("دریافت موقعیت طول کشید. دوباره امتحان کنید.");
+    } else {
+      setPermDenied(false);
+      setError(`خطای GPS: ${err.message || "نامشخص"}`);
+    }
+  }
 
   useEffect(() => {
     if (!tracking) return;
@@ -41,23 +71,12 @@ export function CourierDashboard({
       setError("مرورگر شما GPS پشتیبانی نمی‌کند.");
       return;
     }
-    const id = navigator.geolocation.watchPosition(
-      async (p) => {
-        const lat = p.coords.latitude;
-        const lng = p.coords.longitude;
-        setPos({ lat, lng });
-        try {
-          await fetch("/api/courier/location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat, lng }),
-          });
-        } catch {}
-      },
-      (err) => setError(`خطای GPS: ${err.message}`),
-      { enableHighAccuracy: true, maximumAge: 5000 }
-    );
+    const id = navigator.geolocation.watchPosition(handlePosition, handleError, {
+      enableHighAccuracy: true,
+      maximumAge: 5000,
+    });
     return () => navigator.geolocation.clearWatch(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking]);
 
   function toggleTracking() {
@@ -65,29 +84,21 @@ export function CourierDashboard({
       setTracking(false);
       return;
     }
-    setError(null);
     if (!navigator.geolocation) {
       setError("مرورگر شما GPS پشتیبانی نمی‌کند.");
       return;
     }
-    // Request a fresh fix inside the click handler so iOS Safari treats it
-    // as a user-initiated geolocation request. Only enable continuous
-    // tracking after the user has granted permission.
+    // Call getCurrentPosition synchronously inside the click handler so iOS
+    // Safari treats it as user-initiated. Avoid any React state updates
+    // before this call — they can break the user-gesture chain.
     navigator.geolocation.getCurrentPosition(
-      async (p) => {
-        const lat = p.coords.latitude;
-        const lng = p.coords.longitude;
-        setPos({ lat, lng });
+      (p) => {
+        setPermDenied(false);
+        setError(null);
+        handlePosition(p);
         setTracking(true);
-        try {
-          await fetch("/api/courier/location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat, lng }),
-          });
-        } catch {}
       },
-      (err) => setError(`خطای GPS: ${err.message}`),
+      handleError,
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }
@@ -126,7 +137,23 @@ export function CourierDashboard({
           {tracking ? "خاموش کردن GPS" : "روشن کردن GPS"}
         </button>
       </div>
-      {error && <div className="card p-3 text-sm text-red-600">{error}</div>}
+      {permDenied && (
+        <div className="card space-y-2 p-4 text-sm">
+          <div className="font-semibold text-red-600">دسترسی به موقعیت رد شده است</div>
+          <p className="text-gray-700">
+            مرورگر شما اجازه دسترسی به GPS را برای این سایت بسته است. برای فعال کردن:
+          </p>
+          <ol className="list-inside list-decimal space-y-1 text-gray-700">
+            <li>در Safari آیفون: روی آیکون <span dir="ltr" className="font-mono">aA</span> کنار آدرس → <span className="font-semibold">Website Settings</span> → <span className="font-semibold">Location</span> → <span className="font-semibold">Allow</span></li>
+            <li>در Chrome دسکتاپ: روی قفل کنار آدرس → <span className="font-semibold">Site settings</span> → <span className="font-semibold">Location</span> → <span className="font-semibold">Allow</span></li>
+            <li>سپس صفحه را بسته و دوباره باز کنید، و دکمه «روشن کردن GPS» را بزنید.</li>
+          </ol>
+          <p className="text-gray-500">
+            مطمئن شوید Location Services در تنظیمات دستگاه برای مرورگر روشن است.
+          </p>
+        </div>
+      )}
+      {error && !permDenied && <div className="card p-3 text-sm text-red-600">{error}</div>}
 
       {pos && (
         <div className="card p-4">
