@@ -200,7 +200,7 @@ export function CourierDashboard({
         <Map
           center={mapCenter}
           markers={pos ? [{ lat: pos.lat, lng: pos.lng, title: source === "ip" ? "موقعیت تقریبی شما" : "شما" }] : []}
-          recenter={tracking}
+          recenter={pos != null}
           height={300}
         />
       </div>
