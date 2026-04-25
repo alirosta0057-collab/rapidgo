@@ -54,10 +54,13 @@ export function CourierDashboard({
       setTracking(false);
       setError(null);
     } else if (err.code === 2) {
+      setPermDenied(false);
       setError("موقعیت در دسترس نیست. آیا GPS دستگاه روشن است؟");
     } else if (err.code === 3) {
+      setPermDenied(false);
       setError("دریافت موقعیت طول کشید. دوباره امتحان کنید.");
     } else {
+      setPermDenied(false);
       setError(`خطای GPS: ${err.message || "نامشخص"}`);
     }
   }
