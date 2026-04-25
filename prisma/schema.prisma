@@ -1,59 +1,60 @@
 // Super Market Prisma schema
-// Uses SQLite by default for simple local dev. Switch `provider` to "postgresql"
-// and update DATABASE_URL for production.
+// Uses PostgreSQL. For local development, either run a local Postgres
+// (e.g. via Docker) or use a free Neon/Supabase/Vercel Postgres instance.
+// On Vercel, set DATABASE_URL in the project Environment Variables.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 // ---------- Users & roles ----------
 // Role values: CUSTOMER | ADMIN | COURIER | RESTAURANT
 model User {
-  id            String   @id @default(cuid())
-  name          String
-  email         String   @unique
-  phone         String?  @unique
-  passwordHash  String
-  role          String   @default("CUSTOMER")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String?  @unique
+  passwordHash String
+  role         String   @default("CUSTOMER")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   addresses      Address[]
-  orders         Order[]          @relation("CustomerOrders")
+  orders         Order[]         @relation("CustomerOrders")
   courierProfile CourierProfile?
-  restaurants    Restaurant[]     @relation("RestaurantOwner")
+  restaurants    Restaurant[]    @relation("RestaurantOwner")
 }
 
 model Address {
-  id        String  @id @default(cuid())
-  userId    String
-  title     String
-  fullText  String
-  lat       Float?
-  lng       Float?
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders    Order[]
+  id       String  @id @default(cuid())
+  userId   String
+  title    String
+  fullText String
+  lat      Float?
+  lng      Float?
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders   Order[]
 }
 
 // ---------- Catalog ----------
 // Category kind: FOOD | HYGIENE | SUPERSTORE
 model Category {
-  id          String   @id @default(cuid())
-  slug        String   @unique
+  id          String               @id @default(cuid())
+  slug        String               @unique
   name        String
-  kind        String   @default("FOOD")
+  kind        String               @default("FOOD")
   imageUrl    String?
   parentId    String?
-  parent      Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children    Category[] @relation("CategoryTree")
+  parent      Category?            @relation("CategoryTree", fields: [parentId], references: [id])
+  children    Category[]           @relation("CategoryTree")
   restaurants RestaurantCategory[]
   products    Product[]
-  createdAt   DateTime @default(now())
+  createdAt   DateTime             @default(now())
 }
 
 model Restaurant {
@@ -74,7 +75,7 @@ model Restaurant {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner      User?                 @relation("RestaurantOwner", fields: [ownerId], references: [id])
+  owner      User?                @relation("RestaurantOwner", fields: [ownerId], references: [id])
   categories RestaurantCategory[]
   menu       MenuItem[]
   orders     Order[]
@@ -90,30 +91,30 @@ model RestaurantCategory {
 }
 
 model MenuItem {
-  id           String   @id @default(cuid())
+  id           String      @id @default(cuid())
   restaurantId String
   name         String
   description  String?
-  price        Int      // smallest currency unit (e.g. IRR or cents)
+  price        Int // smallest currency unit (e.g. IRR or cents)
   imageUrl     String?
-  isAvailable  Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  isAvailable  Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orderItems   OrderItem[]
 }
 
 // Generic superstore / hygiene products (non-restaurant)
 model Product {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   categoryId  String
   name        String
   description String?
   price       Int
-  stock       Int      @default(0)
+  stock       Int         @default(0)
   imageUrl    String?
-  createdAt   DateTime @default(now())
-  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt   DateTime    @default(now())
+  category    Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   orderItems  OrderItem[]
 }
 
@@ -121,31 +122,31 @@ model Product {
 // Order status values:
 //   PENDING_PAYMENT | PAID | ACCEPTED | PREPARING | ON_THE_WAY | DELIVERED | CANCELLED
 model Order {
-  id              String   @id @default(cuid())
-  customerId      String
-  restaurantId    String?
-  addressId       String?
-  status          String   @default("PENDING_PAYMENT")
-  itemsTotal      Int      @default(0)
-  commissionRate  Float    @default(0.10)
-  commissionFee   Int      @default(0)
-  courierFee      Int      @default(0)
-  discountCode    String?
-  discountAmount  Int      @default(0)
-  total           Int      @default(0)
-  notes           String?
-  paymentRef      String?  // Stripe payment intent id
-  courierId       String?  // assigned courier user id
-  acceptedAt      DateTime?
-  preparingAt     DateTime?
-  onTheWayAt      DateTime?
-  deliveredAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String    @id @default(cuid())
+  customerId     String
+  restaurantId   String?
+  addressId      String?
+  status         String    @default("PENDING_PAYMENT")
+  itemsTotal     Int       @default(0)
+  commissionRate Float     @default(0.10)
+  commissionFee  Int       @default(0)
+  courierFee     Int       @default(0)
+  discountCode   String?
+  discountAmount Int       @default(0)
+  total          Int       @default(0)
+  notes          String?
+  paymentRef     String? // Stripe payment intent id
+  courierId      String? // assigned courier user id
+  acceptedAt     DateTime?
+  preparingAt    DateTime?
+  onTheWayAt     DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  customer   User        @relation("CustomerOrders", fields: [customerId], references: [id])
-  restaurant Restaurant? @relation(fields: [restaurantId], references: [id])
-  address    Address?    @relation(fields: [addressId], references: [id])
+  customer   User         @relation("CustomerOrders", fields: [customerId], references: [id])
+  restaurant Restaurant?  @relation(fields: [restaurantId], references: [id])
+  address    Address?     @relation(fields: [addressId], references: [id])
   items      OrderItem[]
   events     OrderEvent[]
 }
@@ -159,9 +160,9 @@ model OrderItem {
   unitPrice  Int
   quantity   Int
 
-  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  menuItem  MenuItem? @relation(fields: [menuItemId], references: [id])
-  product   Product?  @relation(fields: [productId], references: [id])
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem MenuItem? @relation(fields: [menuItemId], references: [id])
+  product  Product?  @relation(fields: [productId], references: [id])
 }
 
 model OrderEvent {
@@ -175,29 +176,29 @@ model OrderEvent {
 
 // ---------- Courier ----------
 model CourierProfile {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  vehiclePlate  String?
-  isOnline      Boolean  @default(false)
-  isApproved    Boolean  @default(false)
-  baseFee       Int      @default(20000)
-  lastIp        String?
-  lastLat       Float?
-  lastLng       Float?
-  lastSeenAt    DateTime?
-  createdAt     DateTime @default(now())
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  vehiclePlate String?
+  isOnline     Boolean   @default(false)
+  isApproved   Boolean   @default(false)
+  baseFee      Int       @default(20000)
+  lastIp       String?
+  lastLat      Float?
+  lastLng      Float?
+  lastSeenAt   DateTime?
+  createdAt    DateTime  @default(now())
 
   user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   locations CourierLocation[]
 }
 
 model CourierLocation {
-  id         String   @id @default(cuid())
+  id         String         @id @default(cuid())
   courierId  String
   lat        Float
   lng        Float
   ip         String?
-  recordedAt DateTime @default(now())
+  recordedAt DateTime       @default(now())
   courier    CourierProfile @relation(fields: [courierId], references: [id], onDelete: Cascade)
 
   @@index([courierId, recordedAt])
@@ -205,44 +206,44 @@ model CourierLocation {
 
 // ---------- Marketing ----------
 model Ad {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   title     String
   imageUrl  String
   linkUrl   String?
-  placement String   @default("HOME") // HOME | CATEGORY | RESTAURANT
-  isActive  Boolean  @default(true)
+  placement String    @default("HOME") // HOME | CATEGORY | RESTAURANT
+  isActive  Boolean   @default(true)
   startsAt  DateTime?
   endsAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 }
 
 model Festival {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   title       String
-  slug        String   @unique
+  slug        String      @unique
   description String?
   bannerUrl   String?
   startsAt    DateTime
   endsAt      DateTime
-  isActive    Boolean  @default(true)
+  isActive    Boolean     @default(true)
   promotions  Promotion[]
-  createdAt   DateTime @default(now())
+  createdAt   DateTime    @default(now())
 }
 
 // Promotion / discount code attached to a festival or standalone
 model Promotion {
-  id              String    @id @default(cuid())
-  code            String    @unique
-  festivalId      String?
-  description     String?
-  percentOff      Int?      // 0-100
-  amountOff       Int?      // fixed amount discount
-  minOrderTotal   Int       @default(0)
-  maxRedemptions  Int?
-  redemptions     Int       @default(0)
-  startsAt        DateTime?
-  endsAt          DateTime?
-  isActive        Boolean   @default(true)
-  festival        Festival? @relation(fields: [festivalId], references: [id])
-  createdAt       DateTime  @default(now())
+  id             String    @id @default(cuid())
+  code           String    @unique
+  festivalId     String?
+  description    String?
+  percentOff     Int? // 0-100
+  amountOff      Int? // fixed amount discount
+  minOrderTotal  Int       @default(0)
+  maxRedemptions Int?
+  redemptions    Int       @default(0)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  isActive       Boolean   @default(true)
+  festival       Festival? @relation(fields: [festivalId], references: [id])
+  createdAt      DateTime  @default(now())
 }
