@@ -31,7 +31,7 @@ export function CourierDashboard({
       ? { lat: profile.lastLat, lng: profile.lastLng }
       : null
   );
-  const [tracking, setTracking] = useState<boolean>(profile?.isOnline ?? false);
+  const [tracking, setTracking] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
 
@@ -59,6 +59,38 @@ export function CourierDashboard({
     );
     return () => navigator.geolocation.clearWatch(id);
   }, [tracking]);
+
+  function toggleTracking() {
+    if (tracking) {
+      setTracking(false);
+      return;
+    }
+    setError(null);
+    if (!navigator.geolocation) {
+      setError("مرورگر شما GPS پشتیبانی نمی‌کند.");
+      return;
+    }
+    // Request a fresh fix inside the click handler so iOS Safari treats it
+    // as a user-initiated geolocation request. Only enable continuous
+    // tracking after the user has granted permission.
+    navigator.geolocation.getCurrentPosition(
+      async (p) => {
+        const lat = p.coords.latitude;
+        const lng = p.coords.longitude;
+        setPos({ lat, lng });
+        setTracking(true);
+        try {
+          await fetch("/api/courier/location", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat, lng }),
+          });
+        } catch {}
+      },
+      (err) => setError(`خطای GPS: ${err.message}`),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
 
   async function act(orderId: string, action: "accept" | "advance" | "deliver") {
     setActing(orderId + ":" + action);
@@ -89,7 +121,7 @@ export function CourierDashboard({
         </div>
         <button
           className={tracking ? "btn-outline" : "btn-primary"}
-          onClick={() => setTracking(!tracking)}
+          onClick={toggleTracking}
         >
           {tracking ? "خاموش کردن GPS" : "روشن کردن GPS"}
         </button>
