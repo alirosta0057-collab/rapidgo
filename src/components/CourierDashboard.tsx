@@ -39,6 +39,10 @@ export function CourierDashboard({
   const [tracking, setTracking] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
+  const [updateCount, setUpdateCount] = useState<number>(0);
+  const [tick, setTick] = useState<number>(0);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
   const ipFallbackTried = useRef(false);
 
   function handlePosition(p: GeolocationPosition) {
@@ -46,6 +50,9 @@ export function CourierDashboard({
     const lng = p.coords.longitude;
     setPos({ lat, lng });
     setSource("gps");
+    setAccuracy(p.coords.accuracy ?? null);
+    setLastUpdatedAt(Date.now());
+    setUpdateCount((n) => n + 1);
     fetch("/api/courier/location", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -68,6 +75,9 @@ export function CourierDashboard({
       const data = (await r.json()) as { lat: number; lng: number; city: string | null };
       setPos({ lat: data.lat, lng: data.lng });
       setSource("ip");
+      setAccuracy(null);
+      setLastUpdatedAt(Date.now());
+      setUpdateCount((n) => n + 1);
       setError(null);
       return true;
     } catch {
@@ -117,6 +127,25 @@ export function CourierDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Tick once a second so the "X seconds ago" label keeps moving even between updates.
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // While we're falling back to IP (no GPS), refresh the IP location every 30s
+  // so the courier still has a periodic heartbeat. Real-time precision still
+  // requires the user to grant GPS permission.
+  useEffect(() => {
+    if (tracking) return;
+    if (source !== "ip") return;
+    const id = setInterval(() => {
+      void fallbackToIp("manual");
+    }, 30000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracking, source]);
+
   function toggleTracking() {
     if (tracking) {
       setTracking(false);
@@ -165,6 +194,12 @@ export function CourierDashboard({
     ? "آنلاین"
     : "آفلاین";
 
+  // tick is intentionally read so the JSX re-renders every second and the
+  // "X seconds ago" label stays current.
+  void tick;
+  const secondsAgo =
+    lastUpdatedAt != null ? Math.max(0, Math.floor((Date.now() - lastUpdatedAt) / 1000)) : null;
+
   return (
     <div className="space-y-6">
       <div className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -180,9 +215,31 @@ export function CourierDashboard({
             {pos && <span className="mx-2 text-xs">({pos.lat.toFixed(5)}, {pos.lng.toFixed(5)})</span>}
             {profile?.lastIp && <span className="text-xs"> — IP: {profile.lastIp}</span>}
           </p>
+          <p className="mt-1 text-xs text-gray-500">
+            {secondsAgo == null ? (
+              <span>هنوز به‌روزرسانی نشده</span>
+            ) : (
+              <span>
+                آخرین به‌روزرسانی: <span className="font-mono">{secondsAgo}</span> ثانیه پیش
+                {" — "}
+                تعداد کل: <span className="font-mono">{updateCount}</span>
+                {accuracy != null && (
+                  <>
+                    {" — "}
+                    دقت GPS: <span className="font-mono">{Math.round(accuracy)}m</span>
+                  </>
+                )}
+              </span>
+            )}
+          </p>
           {source === "ip" && !tracking && (
             <p className="mt-1 text-xs text-amber-700">
-              این موقعیت تقریبی از روی IP است. برای موقعیت دقیق روی «روشن کردن GPS» بزنید.
+              این موقعیت تقریبی از روی IP است (هر ۳۰ ثانیه refresh می‌شود). برای ردیابی زنده و دقیق روی «روشن کردن GPS» بزنید و در popup مرورگر Allow بزنید.
+            </p>
+          )}
+          {tracking && (
+            <p className="mt-1 text-xs text-green-700">
+              ردیابی زنده فعال است. هر تغییر موقعیت GPS automatically روی نقشه و سرور به‌روزرسانی می‌شود.
             </p>
           )}
         </div>
