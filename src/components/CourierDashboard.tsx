@@ -109,6 +109,10 @@ export function CourierDashboard({
     // error callback and trigger unbounded IP fallback requests.
     setTracking(false);
     trackingRef.current = false;
+    // Clear sourceRef so the IP fallback we're about to invoke isn't
+    // suppressed by gpsAlreadyEngaged() — GPS is no longer authoritative
+    // once it has errored out.
+    sourceRef.current = null;
     if (err.code === 1) {
       setError("دسترسی GPS رد شد. در حال دریافت موقعیت تقریبی از IP…");
       void fallbackToIp("denied");
