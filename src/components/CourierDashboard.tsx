@@ -119,9 +119,11 @@ export function CourierDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking]);
 
+  // Always do a fresh IP lookup on mount, even if profile already has stored
+  // coords. Stored coords may be stale (e.g. from a previous session on a
+  // different network), so we override them with the current request's IP.
   useEffect(() => {
     if (ipFallbackTried.current) return;
-    if (pos != null) return;
     ipFallbackTried.current = true;
     void fallbackToIp("manual");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,7 +135,7 @@ export function CourierDashboard({
     return () => clearInterval(id);
   }, []);
 
-  // While we're falling back to IP (no GPS), refresh the IP location every 30s
+  // While we're falling back to IP (no GPS), refresh the IP location every 5s
   // so the courier still has a periodic heartbeat. Real-time precision still
   // requires the user to grant GPS permission.
   useEffect(() => {
@@ -141,7 +143,7 @@ export function CourierDashboard({
     if (source !== "ip") return;
     const id = setInterval(() => {
       void fallbackToIp("manual");
-    }, 30000);
+    }, 5000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking, source]);
@@ -234,7 +236,7 @@ export function CourierDashboard({
           </p>
           {source === "ip" && !tracking && (
             <p className="mt-1 text-xs text-amber-700">
-              این موقعیت تقریبی از روی IP است (هر ۳۰ ثانیه refresh می‌شود). برای ردیابی زنده و دقیق روی «روشن کردن GPS» بزنید و در popup مرورگر Allow بزنید.
+              این موقعیت تقریبی از روی IP است (هر ۵ ثانیه refresh می‌شود). برای ردیابی زنده و دقیق روی «روشن کردن GPS» بزنید و در popup مرورگر Allow بزنید.
             </p>
           )}
           {tracking && (
