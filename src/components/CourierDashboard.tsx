@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Map } from "./MapDynamic";
 import { ORDER_STATUS_FA, OrderStatus } from "@/lib/roles";
 import { formatToman } from "@/lib/money";
@@ -17,6 +17,10 @@ type OrderLite = {
   items: { name: string; quantity: number }[];
 };
 
+type LocationSource = "gps" | "ip" | null;
+
+const TEHRAN_CENTER = { lat: 35.6892, lng: 51.389 };
+
 export function CourierDashboard({
   available,
   mine,
@@ -31,15 +35,17 @@ export function CourierDashboard({
       ? { lat: profile.lastLat, lng: profile.lastLng }
       : null
   );
+  const [source, setSource] = useState<LocationSource>(null);
   const [tracking, setTracking] = useState<boolean>(false);
-  const [permDenied, setPermDenied] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const ipFallbackTried = useRef(false);
 
   function handlePosition(p: GeolocationPosition) {
     const lat = p.coords.latitude;
     const lng = p.coords.longitude;
     setPos({ lat, lng });
+    setSource("gps");
     fetch("/api/courier/location", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -47,21 +53,45 @@ export function CourierDashboard({
     }).catch(() => {});
   }
 
-  function handleError(err: GeolocationPositionError) {
-    if (err.code === 1) {
-      // PERMISSION_DENIED — show actionable UI instead of a tiny message.
-      setPermDenied(true);
-      setTracking(false);
+  async function fallbackToIp(reason: "denied" | "unavailable" | "timeout" | "manual") {
+    try {
+      const r = await fetch("/api/courier/location/ip", { method: "POST" });
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}));
+        if (reason === "denied") {
+          setError("دسترسی GPS رد شد و موقعیت IP هم در دسترس نیست. " + (data?.error || ""));
+        } else {
+          setError("موقعیت IP در دسترس نیست. " + (data?.error || ""));
+        }
+        return false;
+      }
+      const data = (await r.json()) as { lat: number; lng: number; city: string | null };
+      setPos({ lat: data.lat, lng: data.lng });
+      setSource("ip");
       setError(null);
+      return true;
+    } catch {
+      setError("خطا در دریافت موقعیت IP.");
+      return false;
+    }
+  }
+
+  function handleError(err: GeolocationPositionError) {
+    // Stop the watcher on any error so watchPosition doesn't keep firing the
+    // error callback and trigger unbounded IP fallback requests.
+    setTracking(false);
+    if (err.code === 1) {
+      setError("دسترسی GPS رد شد. در حال دریافت موقعیت تقریبی از IP…");
+      void fallbackToIp("denied");
     } else if (err.code === 2) {
-      setPermDenied(false);
-      setError("موقعیت در دسترس نیست. آیا GPS دستگاه روشن است؟");
+      setError("GPS دستگاه در دسترس نیست. در حال دریافت موقعیت تقریبی از IP…");
+      void fallbackToIp("unavailable");
     } else if (err.code === 3) {
-      setPermDenied(false);
-      setError("دریافت موقعیت طول کشید. دوباره امتحان کنید.");
+      setError("دریافت GPS طول کشید. در حال دریافت موقعیت تقریبی از IP…");
+      void fallbackToIp("timeout");
     } else {
-      setPermDenied(false);
-      setError(`خطای GPS: ${err.message || "نامشخص"}`);
+      setError("خطا در دریافت GPS. در حال دریافت موقعیت تقریبی از IP…");
+      void fallbackToIp("manual");
     }
   }
 
@@ -79,6 +109,14 @@ export function CourierDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking]);
 
+  useEffect(() => {
+    if (ipFallbackTried.current) return;
+    if (pos != null) return;
+    ipFallbackTried.current = true;
+    void fallbackToIp("manual");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function toggleTracking() {
     if (tracking) {
       setTracking(false);
@@ -86,14 +124,11 @@ export function CourierDashboard({
     }
     if (!navigator.geolocation) {
       setError("مرورگر شما GPS پشتیبانی نمی‌کند.");
+      void fallbackToIp("manual");
       return;
     }
-    // Call getCurrentPosition synchronously inside the click handler so iOS
-    // Safari treats it as user-initiated. Avoid any React state updates
-    // before this call — they can break the user-gesture chain.
     navigator.geolocation.getCurrentPosition(
       (p) => {
-        setPermDenied(false);
         setError(null);
         handlePosition(p);
         setTracking(true);
@@ -119,16 +154,37 @@ export function CourierDashboard({
     location.reload();
   }
 
+  const mapCenter = pos ?? TEHRAN_CENTER;
+  const onlineLabel = tracking
+    ? "آنلاین (GPS دقیق)"
+    : source === "gps" && pos
+    ? "آنلاین (GPS)"
+    : source === "ip" && pos
+    ? "آنلاین (تقریبی از IP)"
+    : pos
+    ? "آنلاین"
+    : "آفلاین";
+
   return (
     <div className="space-y-6">
       <div className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold">پنل پیک</h1>
           <p className="text-sm text-gray-500">
-            وضعیت ردیابی: {tracking ? <span className="text-green-600">آنلاین</span> : <span className="text-gray-400">آفلاین</span>}
+            وضعیت ردیابی:{" "}
+            {pos ? (
+              <span className="text-green-600">{onlineLabel}</span>
+            ) : (
+              <span className="text-gray-400">{onlineLabel}</span>
+            )}
             {pos && <span className="mx-2 text-xs">({pos.lat.toFixed(5)}, {pos.lng.toFixed(5)})</span>}
             {profile?.lastIp && <span className="text-xs"> — IP: {profile.lastIp}</span>}
           </p>
+          {source === "ip" && !tracking && (
+            <p className="mt-1 text-xs text-amber-700">
+              این موقعیت تقریبی از روی IP است. برای موقعیت دقیق روی «روشن کردن GPS» بزنید.
+            </p>
+          )}
         </div>
         <button
           className={tracking ? "btn-outline" : "btn-primary"}
@@ -137,30 +193,18 @@ export function CourierDashboard({
           {tracking ? "خاموش کردن GPS" : "روشن کردن GPS"}
         </button>
       </div>
-      {permDenied && (
-        <div className="card space-y-2 p-4 text-sm">
-          <div className="font-semibold text-red-600">دسترسی به موقعیت رد شده است</div>
-          <p className="text-gray-700">
-            مرورگر شما اجازه دسترسی به GPS را برای این سایت بسته است. برای فعال کردن:
-          </p>
-          <ol className="list-inside list-decimal space-y-1 text-gray-700">
-            <li>در Safari آیفون: روی آیکون <span dir="ltr" className="font-mono">aA</span> کنار آدرس → <span className="font-semibold">Website Settings</span> → <span className="font-semibold">Location</span> → <span className="font-semibold">Allow</span></li>
-            <li>در Chrome دسکتاپ: روی قفل کنار آدرس → <span className="font-semibold">Site settings</span> → <span className="font-semibold">Location</span> → <span className="font-semibold">Allow</span></li>
-            <li>سپس صفحه را بسته و دوباره باز کنید، و دکمه «روشن کردن GPS» را بزنید.</li>
-          </ol>
-          <p className="text-gray-500">
-            مطمئن شوید Location Services در تنظیمات دستگاه برای مرورگر روشن است.
-          </p>
-        </div>
-      )}
-      {error && !permDenied && <div className="card p-3 text-sm text-red-600">{error}</div>}
 
-      {pos && (
-        <div className="card p-4">
-          <h2 className="mb-2 font-semibold">نقشه</h2>
-          <Map center={pos} markers={[{ lat: pos.lat, lng: pos.lng, title: "شما" }]} recenter height={300} />
-        </div>
-      )}
+      {error && <div className="card p-3 text-sm text-amber-700">{error}</div>}
+
+      <div className="card p-4">
+        <h2 className="mb-2 font-semibold">نقشه</h2>
+        <Map
+          center={mapCenter}
+          markers={pos ? [{ lat: pos.lat, lng: pos.lng, title: source === "ip" ? "موقعیت تقریبی شما" : "شما" }] : []}
+          recenter={pos != null}
+          height={300}
+        />
+      </div>
 
       <section>
         <h2 className="mb-3 text-lg font-bold">سفارش‌های در حال انجام شما</h2>
