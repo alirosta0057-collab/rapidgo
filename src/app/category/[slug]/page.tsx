@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatToman } from "@/lib/money";
 import { AddToCartButton } from "@/components/AddToCartButton";
+import { getT } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function CategoryPage({ params }: { params: { slug: string } }) {
+  const { t, locale } = getT();
   const category = await prisma.category.findUnique({
     where: { slug: params.slug },
     include: {
@@ -18,18 +20,23 @@ export default async function CategoryPage({ params }: { params: { slug: string 
   });
   if (!category) notFound();
 
+  const kindLabel =
+    category.kind === "FOOD"
+      ? t("category.food")
+      : category.kind === "HYGIENE"
+      ? t("category.hygiene")
+      : t("category.superstore");
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold">{category.name}</h1>
-        <p className="text-sm text-gray-500">
-          {category.kind === "FOOD" ? "غذایی" : category.kind === "HYGIENE" ? "بهداشتی" : "سوپرمارکت"}
-        </p>
+        <p className="text-sm text-gray-500">{kindLabel}</p>
       </div>
 
       {category.children.length > 0 && (
         <section>
-          <h2 className="mb-3 font-semibold">زیرشاخه‌ها</h2>
+          <h2 className="mb-3 font-semibold">{t("category.subcategories")}</h2>
           <div className="flex flex-wrap gap-2">
             {category.children.map((c) => (
               <Link key={c.id} href={`/category/${c.slug}`} className="badge bg-brand-50 text-brand-700 hover:bg-brand-100">
@@ -42,7 +49,7 @@ export default async function CategoryPage({ params }: { params: { slug: string 
 
       {category.kind !== "FOOD" && (
         <section>
-          <h2 className="mb-3 font-semibold">محصولات</h2>
+          <h2 className="mb-3 font-semibold">{t("category.products")}</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {category.products.map((p) => (
               <div key={p.id} className="card overflow-hidden">
@@ -55,7 +62,7 @@ export default async function CategoryPage({ params }: { params: { slug: string 
                   <div className="font-medium">{p.name}</div>
                   <div className="text-sm text-gray-500 line-clamp-2">{p.description}</div>
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-brand-700">{formatToman(p.price)}</span>
+                    <span className="font-semibold text-brand-700">{formatToman(p.price, locale)}</span>
                     <AddToCartButton
                       item={{ id: p.id, kind: "product", name: p.name, unitPrice: p.price, quantity: 1 }}
                       disabled={p.stock <= 0}
@@ -64,14 +71,16 @@ export default async function CategoryPage({ params }: { params: { slug: string 
                 </div>
               </div>
             ))}
-            {category.products.length === 0 && <div className="col-span-full text-gray-500">محصولی موجود نیست.</div>}
+            {category.products.length === 0 && (
+              <div className="col-span-full text-gray-500">{t("category.no_products")}</div>
+            )}
           </div>
         </section>
       )}
 
       {category.kind === "FOOD" && (
         <section>
-          <h2 className="mb-3 font-semibold">رستوران‌ها</h2>
+          <h2 className="mb-3 font-semibold">{t("category.restaurants")}</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {category.restaurants.map(({ restaurant: r }) => (
               <Link key={r.id} href={`/restaurants/${r.slug}`} className="card overflow-hidden hover:shadow-md">
@@ -86,7 +95,9 @@ export default async function CategoryPage({ params }: { params: { slug: string 
                 </div>
               </Link>
             ))}
-            {category.restaurants.length === 0 && <div className="col-span-full text-gray-500">رستورانی در این دسته نیست.</div>}
+            {category.restaurants.length === 0 && (
+              <div className="col-span-full text-gray-500">{t("category.no_restaurants_in_category")}</div>
+            )}
           </div>
         </section>
       )}

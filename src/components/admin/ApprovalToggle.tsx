@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useT } from "@/i18n/client";
 
 export function ApprovalToggle({
   id,
@@ -13,6 +14,7 @@ export function ApprovalToggle({
   approved: boolean;
 }) {
   const router = useRouter();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   async function toggle() {
     setBusy(true);
@@ -26,7 +28,7 @@ export function ApprovalToggle({
   }
   return (
     <button className="btn-outline px-3 py-1 text-xs" onClick={toggle} disabled={busy}>
-      {approved ? "لغو تایید" : "تایید"}
+      {approved ? t("admin.revoke_approval") : t("admin.approve")}
     </button>
   );
 }

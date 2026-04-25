@@ -1,26 +1,28 @@
 import { prisma } from "@/lib/prisma";
 import { ApprovalToggle } from "@/components/admin/ApprovalToggle";
+import { getT } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCouriers() {
+  const { t } = getT();
   const couriers = await prisma.courierProfile.findMany({
     orderBy: { createdAt: "desc" },
     include: { user: true },
   });
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-bold">پیک‌ها</h1>
+      <h1 className="mb-4 text-2xl font-bold">{t("admin.couriers_title")}</h1>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-brand-50 text-right">
             <tr>
-              <th className="p-3">نام</th>
-              <th className="p-3">ایمیل</th>
-              <th className="p-3">آنلاین</th>
-              <th className="p-3">آخرین موقعیت</th>
-              <th className="p-3">IP</th>
-              <th className="p-3">وضعیت</th>
+              <th className="p-3">{t("common.name")}</th>
+              <th className="p-3">{t("common.email")}</th>
+              <th className="p-3">{t("admin.col_online")}</th>
+              <th className="p-3">{t("admin.col_last_position")}</th>
+              <th className="p-3">{t("admin.col_ip")}</th>
+              <th className="p-3">{t("common.status")}</th>
               <th className="p-3"></th>
             </tr>
           </thead>
@@ -38,9 +40,9 @@ export default async function AdminCouriers() {
                 <td className="p-3 text-xs">{c.lastIp || "-"}</td>
                 <td className="p-3">
                   {c.isApproved ? (
-                    <span className="badge bg-green-100 text-green-700">تایید شده</span>
+                    <span className="badge bg-green-100 text-green-700">{t("admin.approved")}</span>
                   ) : (
-                    <span className="badge bg-yellow-100 text-yellow-700">در انتظار</span>
+                    <span className="badge bg-yellow-100 text-yellow-700">{t("admin.pending")}</span>
                   )}
                 </td>
                 <td className="p-3 text-left">
@@ -49,7 +51,7 @@ export default async function AdminCouriers() {
               </tr>
             ))}
             {couriers.length === 0 && (
-              <tr><td className="p-4 text-gray-500" colSpan={7}>پیکی ثبت نشده.</td></tr>
+              <tr><td className="p-4 text-gray-500" colSpan={7}>{t("admin.no_couriers")}</td></tr>
             )}
           </tbody>
         </table>

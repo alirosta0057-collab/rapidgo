@@ -1,9 +1,11 @@
 "use client";
 
 import { useCart, type CartItem } from "./CartProvider";
+import { useT } from "@/i18n/client";
 
 export function AddToCartButton({ item, disabled }: { item: CartItem; disabled?: boolean }) {
   const { add } = useCart();
+  const t = useT();
   return (
     <button
       type="button"
@@ -11,7 +13,7 @@ export function AddToCartButton({ item, disabled }: { item: CartItem; disabled?:
       disabled={disabled}
       onClick={() => add(item)}
     >
-      افزودن
+      {t("common.add")}
     </button>
   );
 }

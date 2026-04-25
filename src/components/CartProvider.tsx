@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useLocale } from "@/i18n/client";
 
 export type CartItem = {
   id: string;            // menuItemId or productId
@@ -25,6 +26,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = "supermarket.cart.v1";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useLocale();
   const [items, setItems] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
@@ -46,7 +48,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       if (item.kind === "menu" && item.restaurantId) {
         const others = prev.filter((p) => p.kind === "menu" && p.restaurantId && p.restaurantId !== item.restaurantId);
         if (others.length > 0) {
-          if (!confirm("سبد خرید شما شامل آیتم‌هایی از رستوران دیگر است. آیا می‌خواهید سبد را خالی کنید؟")) {
+          if (!confirm(t("cart.confirm_switch_restaurant"))) {
             return prev;
           }
           prev = prev.filter((p) => p.kind !== "menu" || p.restaurantId === item.restaurantId);
@@ -58,7 +60,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       return [...prev, item];
     });
-  }, []);
+  }, [t]);
 
   const remove = useCallback((id: string) => {
     setItems((prev) => prev.filter((p) => p.id !== id));

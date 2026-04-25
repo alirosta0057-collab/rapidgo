@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/prisma";
-import { ORDER_STATUS_FA, OrderStatus } from "@/lib/roles";
+import { ORDER_STATUS_KEY, OrderStatus } from "@/lib/roles";
 import { formatToman } from "@/lib/money";
 import Link from "next/link";
+import { getT } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminOrders() {
+  const { t, locale } = getT();
+  const dateLocale = locale === "fa" ? "fa-IR" : "en-US";
   const orders = await prisma.order.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -13,19 +16,19 @@ export default async function AdminOrders() {
   });
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-bold">سفارش‌ها</h1>
+      <h1 className="mb-4 text-2xl font-bold">{t("admin.orders_title")}</h1>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-brand-50 text-right">
             <tr>
-              <th className="p-3">شناسه</th>
-              <th className="p-3">مشتری</th>
-              <th className="p-3">رستوران</th>
-              <th className="p-3">جمع</th>
-              <th className="p-3">کمیسیون</th>
-              <th className="p-3">حق پیک</th>
-              <th className="p-3">وضعیت</th>
-              <th className="p-3">تاریخ</th>
+              <th className="p-3">{t("admin.col_id")}</th>
+              <th className="p-3">{t("admin.col_customer")}</th>
+              <th className="p-3">{t("admin.col_restaurant")}</th>
+              <th className="p-3">{t("admin.col_total")}</th>
+              <th className="p-3">{t("admin.col_commission")}</th>
+              <th className="p-3">{t("admin.col_courier_fee")}</th>
+              <th className="p-3">{t("admin.col_status")}</th>
+              <th className="p-3">{t("admin.col_date")}</th>
             </tr>
           </thead>
           <tbody>
@@ -37,18 +40,18 @@ export default async function AdminOrders() {
                   </Link>
                 </td>
                 <td className="p-3 text-xs">{o.customer.name}</td>
-                <td className="p-3 text-xs">{o.restaurant?.name || "سوپرمارکت"}</td>
-                <td className="p-3">{formatToman(o.total)}</td>
-                <td className="p-3 text-gray-500">{formatToman(o.commissionFee)}</td>
-                <td className="p-3 text-gray-500">{formatToman(o.courierFee)}</td>
+                <td className="p-3 text-xs">{o.restaurant?.name || t("admin.supermarket")}</td>
+                <td className="p-3">{formatToman(o.total, locale)}</td>
+                <td className="p-3 text-gray-500">{formatToman(o.commissionFee, locale)}</td>
+                <td className="p-3 text-gray-500">{formatToman(o.courierFee, locale)}</td>
                 <td className="p-3">
-                  <span className="badge bg-brand-50 text-brand-700">{ORDER_STATUS_FA[o.status as OrderStatus]}</span>
+                  <span className="badge bg-brand-50 text-brand-700">{t(ORDER_STATUS_KEY[o.status as OrderStatus])}</span>
                 </td>
-                <td className="p-3 text-xs text-gray-500">{new Date(o.createdAt).toLocaleString("fa-IR")}</td>
+                <td className="p-3 text-xs text-gray-500">{new Date(o.createdAt).toLocaleString(dateLocale)}</td>
               </tr>
             ))}
             {orders.length === 0 && (
-              <tr><td className="p-4 text-gray-500" colSpan={8}>سفارشی نیست.</td></tr>
+              <tr><td className="p-4 text-gray-500" colSpan={8}>{t("admin.no_orders")}</td></tr>
             )}
           </tbody>
         </table>

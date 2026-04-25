@@ -2,15 +2,18 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound, redirect } from "next/navigation";
-import { ORDER_STATUS_FA, OrderStatus } from "@/lib/roles";
+import { ORDER_STATUS_KEY, OrderStatus } from "@/lib/roles";
 import { formatToman } from "@/lib/money";
 import { OrderTracker } from "@/components/OrderTracker";
+import { getT } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function OrderDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect(`/login?callbackUrl=/orders/${params.id}`);
+  const { t, locale } = getT();
+  const dateLocale = locale === "fa" ? "fa-IR" : "en-US";
 
   const order = await prisma.order.findUnique({
     where: { id: params.id },
@@ -39,52 +42,56 @@ export default async function OrderDetailPage({ params }: { params: { id: string
     <div className="space-y-6">
       <div className="card p-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">سفارش #{order.id.slice(-6)}</h1>
-          <span className="badge bg-brand-100 text-brand-700">{ORDER_STATUS_FA[order.status as OrderStatus]}</span>
+          <h1 className="text-xl font-bold">{t("orders.order_number", { id: order.id.slice(-6) })}</h1>
+          <span className="badge bg-brand-100 text-brand-700">{t(ORDER_STATUS_KEY[order.status as OrderStatus])}</span>
         </div>
-        <div className="mt-2 text-sm text-gray-500">{new Date(order.createdAt).toLocaleString("fa-IR")}</div>
+        <div className="mt-2 text-sm text-gray-500">{new Date(order.createdAt).toLocaleString(dateLocale)}</div>
       </div>
 
       {courier && courier.lastLat != null && courier.lastLng != null && (
         <div className="card p-4">
-          <h2 className="mb-2 font-semibold">موقعیت پیک</h2>
+          <h2 className="mb-2 font-semibold">{t("orders.courier_position")}</h2>
           <div className="mb-2 text-sm text-gray-600">
-            {courier.user.name} — IP: {courier.lastIp || "-"} — آخرین بروزرسانی: {courier.lastSeenAt ? new Date(courier.lastSeenAt).toLocaleString("fa-IR") : "-"}
+            {t("orders.courier_last_seen", {
+              name: courier.user.name,
+              ip: courier.lastIp || "-",
+              time: courier.lastSeenAt ? new Date(courier.lastSeenAt).toLocaleString(dateLocale) : "-",
+            })}
           </div>
           <OrderTracker orderId={order.id} initialLat={courier.lastLat} initialLng={courier.lastLng} />
         </div>
       )}
 
       <div className="card p-4">
-        <h2 className="mb-2 font-semibold">آیتم‌ها</h2>
+        <h2 className="mb-2 font-semibold">{t("orders.items")}</h2>
         <div className="divide-y">
           {order.items.map((it) => (
             <div key={it.id} className="flex items-center justify-between py-2 text-sm">
-              <span>{it.name} × {it.quantity}</span>
-              <span>{formatToman(it.unitPrice * it.quantity)}</span>
+              <span>{t("orders.item_line", { name: it.name, qty: it.quantity })}</span>
+              <span>{formatToman(it.unitPrice * it.quantity, locale)}</span>
             </div>
           ))}
         </div>
         <div className="mt-3 space-y-1 border-t pt-3 text-sm">
-          <div className="flex justify-between"><span>جمع آیتم‌ها</span><span>{formatToman(order.itemsTotal)}</span></div>
-          <div className="flex justify-between text-gray-500"><span>کمیسیون سایت</span><span>{formatToman(order.commissionFee)}</span></div>
-          <div className="flex justify-between"><span>حق سرویس پیک</span><span>{formatToman(order.courierFee)}</span></div>
+          <div className="flex justify-between"><span>{t("orders.items_total")}</span><span>{formatToman(order.itemsTotal, locale)}</span></div>
+          <div className="flex justify-between text-gray-500"><span>{t("orders.site_commission")}</span><span>{formatToman(order.commissionFee, locale)}</span></div>
+          <div className="flex justify-between"><span>{t("orders.courier_fee")}</span><span>{formatToman(order.courierFee, locale)}</span></div>
           {order.discountAmount > 0 && (
             <div className="flex justify-between text-green-600">
-              <span>تخفیف ({order.discountCode})</span><span>- {formatToman(order.discountAmount)}</span>
+              <span>{t("orders.discount_with_code", { code: order.discountCode || "" })}</span><span>- {formatToman(order.discountAmount, locale)}</span>
             </div>
           )}
-          <div className="flex justify-between text-base font-bold"><span>قابل پرداخت</span><span>{formatToman(order.total)}</span></div>
+          <div className="flex justify-between text-base font-bold"><span>{t("orders.payable")}</span><span>{formatToman(order.total, locale)}</span></div>
         </div>
       </div>
 
       <div className="card p-4">
-        <h2 className="mb-2 font-semibold">تاریخچه وضعیت</h2>
+        <h2 className="mb-2 font-semibold">{t("orders.status_history")}</h2>
         <ul className="space-y-1 text-sm">
           {order.events.map((ev) => (
             <li key={ev.id} className="flex justify-between">
-              <span>{ORDER_STATUS_FA[ev.status as OrderStatus] || ev.status}</span>
-              <span className="text-xs text-gray-500">{new Date(ev.createdAt).toLocaleString("fa-IR")}</span>
+              <span>{t(ORDER_STATUS_KEY[ev.status as OrderStatus] ?? "") || ev.status}</span>
+              <span className="text-xs text-gray-500">{new Date(ev.createdAt).toLocaleString(dateLocale)}</span>
             </li>
           ))}
         </ul>
