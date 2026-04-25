@@ -44,12 +44,15 @@ export function CourierDashboard({
   const [tick, setTick] = useState<number>(0);
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const ipFallbackTried = useRef(false);
+  const sourceRef = useRef<LocationSource>(null);
+  const trackingRef = useRef(false);
 
   function handlePosition(p: GeolocationPosition) {
     const lat = p.coords.latitude;
     const lng = p.coords.longitude;
     setPos({ lat, lng });
     setSource("gps");
+    sourceRef.current = "gps";
     setAccuracy(p.coords.accuracy ?? null);
     setLastUpdatedAt(Date.now());
     setUpdateCount((n) => n + 1);
@@ -60,9 +63,19 @@ export function CourierDashboard({
     }).catch(() => {});
   }
 
+  function gpsAlreadyEngaged(): boolean {
+    return trackingRef.current || sourceRef.current === "gps";
+  }
+
   async function fallbackToIp(reason: "denied" | "unavailable" | "timeout" | "manual") {
     try {
       const r = await fetch("/api/courier/location/ip", { method: "POST" });
+      // If GPS started (or already produced a fix) while this IP request was
+      // in flight, drop the response so we don't downgrade an accurate GPS
+      // position to coarse IP coords.
+      if (gpsAlreadyEngaged()) {
+        return false;
+      }
       if (!r.ok) {
         const data = await r.json().catch(() => ({}));
         if (reason === "denied") {
@@ -73,8 +86,13 @@ export function CourierDashboard({
         return false;
       }
       const data = (await r.json()) as { lat: number; lng: number; city: string | null };
+      // Re-check after the JSON parse await as well.
+      if (gpsAlreadyEngaged()) {
+        return false;
+      }
       setPos({ lat: data.lat, lng: data.lng });
       setSource("ip");
+      sourceRef.current = "ip";
       setAccuracy(null);
       setLastUpdatedAt(Date.now());
       setUpdateCount((n) => n + 1);
@@ -90,6 +108,7 @@ export function CourierDashboard({
     // Stop the watcher on any error so watchPosition doesn't keep firing the
     // error callback and trigger unbounded IP fallback requests.
     setTracking(false);
+    trackingRef.current = false;
     if (err.code === 1) {
       setError("دسترسی GPS رد شد. در حال دریافت موقعیت تقریبی از IP…");
       void fallbackToIp("denied");
@@ -106,6 +125,7 @@ export function CourierDashboard({
   }
 
   useEffect(() => {
+    trackingRef.current = tracking;
     if (!tracking) return;
     if (!navigator.geolocation) {
       setError("مرورگر شما GPS پشتیبانی نمی‌کند.");
@@ -151,6 +171,7 @@ export function CourierDashboard({
   function toggleTracking() {
     if (tracking) {
       setTracking(false);
+      trackingRef.current = false;
       return;
     }
     if (!navigator.geolocation) {
@@ -158,6 +179,9 @@ export function CourierDashboard({
       void fallbackToIp("manual");
       return;
     }
+    // Mark tracking-intent immediately so any in-flight IP fallback drops its
+    // response instead of overwriting the GPS fix that's about to arrive.
+    trackingRef.current = true;
     navigator.geolocation.getCurrentPosition(
       (p) => {
         setError(null);
