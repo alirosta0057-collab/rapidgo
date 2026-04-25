@@ -77,9 +77,10 @@ export function CourierDashboard({
   }
 
   function handleError(err: GeolocationPositionError) {
+    // Stop the watcher on any error so watchPosition doesn't keep firing the
+    // error callback and trigger unbounded IP fallback requests.
+    setTracking(false);
     if (err.code === 1) {
-      // PERMISSION_DENIED — automatically fall back to IP-based location.
-      setTracking(false);
       setError("دسترسی GPS رد شد. در حال دریافت موقعیت تقریبی از IP…");
       void fallbackToIp("denied");
     } else if (err.code === 2) {
