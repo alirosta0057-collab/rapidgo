@@ -5,11 +5,13 @@ import { useSession } from "next-auth/react";
 import { formatToman, calcOrderTotals } from "@/lib/money";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useLocale } from "@/i18n/client";
 
 export default function CheckoutPage() {
   const { items, itemsTotal, clear } = useCart();
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t, locale } = useLocale();
   const [addressText, setAddressText] = useState("");
   const [notes, setNotes] = useState("");
   const [discountCode, setDiscountCode] = useState("");
@@ -38,7 +40,7 @@ export default function CheckoutPage() {
     setValidating(false);
     if (!res.ok) {
       setDiscountAmount(0);
-      setError(data.error || "کد تخفیف نامعتبر است.");
+      setError(data.error || t("checkout.invalid_promo"));
       return;
     }
     setDiscountAmount(data.discountAmount);
@@ -47,7 +49,7 @@ export default function CheckoutPage() {
   async function placeOrder() {
     if (items.length === 0) return;
     if (!addressText.trim()) {
-      setError("آدرس را وارد کنید.");
+      setError(t("checkout.address_required"));
       return;
     }
     setSubmitting(true);
@@ -70,7 +72,7 @@ export default function CheckoutPage() {
     const data = await res.json();
     setSubmitting(false);
     if (!res.ok) {
-      setError(data.error || "ثبت سفارش ناموفق بود.");
+      setError(data.error || t("checkout.order_failed"));
       return;
     }
     clear();
@@ -85,46 +87,50 @@ export default function CheckoutPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <h1 className="text-2xl font-bold">پرداخت</h1>
+      <h1 className="text-2xl font-bold">{t("checkout.title")}</h1>
 
       {items.length === 0 ? (
-        <div className="card p-6 text-center text-gray-500">سبد شما خالی است.</div>
+        <div className="card p-6 text-center text-gray-500">{t("checkout.cart_empty")}</div>
       ) : (
         <>
           <div className="card space-y-4 p-4">
             <div>
-              <label className="label">آدرس تحویل</label>
+              <label className="label">{t("checkout.delivery_address")}</label>
               <textarea className="input min-h-20" value={addressText} onChange={(e) => setAddressText(e.target.value)} />
             </div>
             <div>
-              <label className="label">توضیحات (اختیاری)</label>
+              <label className="label">{t("checkout.notes_optional")}</label>
               <textarea className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
             <div>
-              <label className="label">کد تخفیف</label>
+              <label className="label">{t("checkout.promo_code")}</label>
               <div className="flex gap-2">
                 <input className="input" value={discountCode} onChange={(e) => setDiscountCode(e.target.value)} />
                 <button className="btn-outline" onClick={applyDiscount} disabled={validating}>
-                  {validating ? "..." : "اعمال"}
+                  {validating ? "..." : t("common.apply")}
                 </button>
               </div>
             </div>
           </div>
 
           <div className="card divide-y p-4">
-            <Row label="جمع آیتم‌ها" value={formatToman(totals.itemsTotal)} />
-            <Row label={`کمیسیون سایت (${(totals.commissionRate * 100).toFixed(0)}٪)`} value={formatToman(totals.commissionFee)} muted />
-            <Row label="حق سرویس پیک" value={formatToman(totals.courierFee)} />
+            <Row label={t("checkout.items_total")} value={formatToman(totals.itemsTotal, locale)} />
+            <Row
+              label={t("checkout.site_commission", { rate: (totals.commissionRate * 100).toFixed(0) })}
+              value={formatToman(totals.commissionFee, locale)}
+              muted
+            />
+            <Row label={t("checkout.courier_fee")} value={formatToman(totals.courierFee, locale)} />
             {totals.discountAmount > 0 && (
-              <Row label="تخفیف" value={`- ${formatToman(totals.discountAmount)}`} accent />
+              <Row label={t("checkout.discount")} value={`- ${formatToman(totals.discountAmount, locale)}`} accent />
             )}
-            <Row label="مبلغ قابل پرداخت" value={formatToman(totals.total)} bold />
+            <Row label={t("checkout.total_payable")} value={formatToman(totals.total, locale)} bold />
           </div>
 
           {error && <div className="text-sm text-red-600">{error}</div>}
 
           <button className="btn-primary w-full" onClick={placeOrder} disabled={submitting}>
-            {submitting ? "..." : "ثبت سفارش و پرداخت"}
+            {submitting ? "..." : t("checkout.place_order")}
           </button>
         </>
       )}

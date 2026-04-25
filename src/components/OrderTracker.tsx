@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Map } from "./MapDynamic";
+import { useT } from "@/i18n/client";
 
 export function OrderTracker({
   orderId,
@@ -13,6 +14,7 @@ export function OrderTracker({
   initialLng: number;
 }) {
   const [pos, setPos] = useState({ lat: initialLat, lng: initialLng });
+  const t = useT();
 
   useEffect(() => {
     let cancelled = false;
@@ -34,5 +36,5 @@ export function OrderTracker({
     };
   }, [orderId]);
 
-  return <Map center={pos} markers={[{ lat: pos.lat, lng: pos.lng, title: "موقعیت پیک" }]} recenter height={320} />;
+  return <Map center={pos} markers={[{ lat: pos.lat, lng: pos.lng, title: t("orders.courier_position") }]} recenter height={320} />;
 }

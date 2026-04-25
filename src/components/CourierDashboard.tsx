@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Map } from "./MapDynamic";
-import { ORDER_STATUS_FA, OrderStatus } from "@/lib/roles";
+import { ORDER_STATUS_KEY, OrderStatus } from "@/lib/roles";
 import { formatToman } from "@/lib/money";
+import { useLocale } from "@/i18n/client";
 
 type OrderLite = {
   id: string;
@@ -30,6 +31,7 @@ export function CourierDashboard({
   mine: OrderLite[];
   profile: { lastLat: number | null; lastLng: number | null; lastIp: string | null; isOnline: boolean } | null;
 }) {
+  const { t, locale } = useLocale();
   const [pos, setPos] = useState<{ lat: number; lng: number } | null>(
     profile?.lastLat != null && profile?.lastLng != null
       ? { lat: profile.lastLat, lng: profile.lastLng }
@@ -70,23 +72,19 @@ export function CourierDashboard({
   async function fallbackToIp(reason: "denied" | "unavailable" | "timeout" | "manual") {
     try {
       const r = await fetch("/api/courier/location/ip", { method: "POST" });
-      // If GPS started (or already produced a fix) while this IP request was
-      // in flight, drop the response so we don't downgrade an accurate GPS
-      // position to coarse IP coords.
       if (gpsAlreadyEngaged()) {
         return false;
       }
       if (!r.ok) {
         const data = await r.json().catch(() => ({}));
         if (reason === "denied") {
-          setError("دسترسی GPS رد شد و موقعیت IP هم در دسترس نیست. " + (data?.error || ""));
+          setError(t("courier.err_gps_denied_ip_unavailable") + (data?.error || ""));
         } else {
-          setError("موقعیت IP در دسترس نیست. " + (data?.error || ""));
+          setError(t("courier.err_ip_unavailable") + (data?.error || ""));
         }
         return false;
       }
       const data = (await r.json()) as { lat: number; lng: number; city: string | null };
-      // Re-check after the JSON parse await as well.
       if (gpsAlreadyEngaged()) {
         return false;
       }
@@ -99,31 +97,26 @@ export function CourierDashboard({
       setError(null);
       return true;
     } catch {
-      setError("خطا در دریافت موقعیت IP.");
+      setError(t("courier.err_ip_fetch_failed"));
       return false;
     }
   }
 
   function handleError(err: GeolocationPositionError) {
-    // Stop the watcher on any error so watchPosition doesn't keep firing the
-    // error callback and trigger unbounded IP fallback requests.
     setTracking(false);
     trackingRef.current = false;
-    // Clear sourceRef so the IP fallback we're about to invoke isn't
-    // suppressed by gpsAlreadyEngaged() — GPS is no longer authoritative
-    // once it has errored out.
     sourceRef.current = null;
     if (err.code === 1) {
-      setError("دسترسی GPS رد شد. در حال دریافت موقعیت تقریبی از IP…");
+      setError(t("courier.err_gps_denied"));
       void fallbackToIp("denied");
     } else if (err.code === 2) {
-      setError("GPS دستگاه در دسترس نیست. در حال دریافت موقعیت تقریبی از IP…");
+      setError(t("courier.err_gps_unavailable"));
       void fallbackToIp("unavailable");
     } else if (err.code === 3) {
-      setError("دریافت GPS طول کشید. در حال دریافت موقعیت تقریبی از IP…");
+      setError(t("courier.err_gps_timeout"));
       void fallbackToIp("timeout");
     } else {
-      setError("خطا در دریافت GPS. در حال دریافت موقعیت تقریبی از IP…");
+      setError(t("courier.err_gps_generic"));
       void fallbackToIp("manual");
     }
   }
@@ -132,7 +125,7 @@ export function CourierDashboard({
     trackingRef.current = tracking;
     if (!tracking) return;
     if (!navigator.geolocation) {
-      setError("مرورگر شما GPS پشتیبانی نمی‌کند.");
+      setError(t("courier.err_browser_no_gps"));
       return;
     }
     const id = navigator.geolocation.watchPosition(handlePosition, handleError, {
@@ -143,9 +136,6 @@ export function CourierDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracking]);
 
-  // Always do a fresh IP lookup on mount, even if profile already has stored
-  // coords. Stored coords may be stale (e.g. from a previous session on a
-  // different network), so we override them with the current request's IP.
   useEffect(() => {
     if (ipFallbackTried.current) return;
     ipFallbackTried.current = true;
@@ -153,15 +143,11 @@ export function CourierDashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tick once a second so the "X seconds ago" label keeps moving even between updates.
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // While we're falling back to IP (no GPS), refresh the IP location every 5s
-  // so the courier still has a periodic heartbeat. Real-time precision still
-  // requires the user to grant GPS permission.
   useEffect(() => {
     if (tracking) return;
     if (source !== "ip") return;
@@ -179,12 +165,10 @@ export function CourierDashboard({
       return;
     }
     if (!navigator.geolocation) {
-      setError("مرورگر شما GPS پشتیبانی نمی‌کند.");
+      setError(t("courier.err_browser_no_gps"));
       void fallbackToIp("manual");
       return;
     }
-    // Mark tracking-intent immediately so any in-flight IP fallback drops its
-    // response instead of overwriting the GPS fix that's about to arrive.
     trackingRef.current = true;
     navigator.geolocation.getCurrentPosition(
       (p) => {
@@ -207,7 +191,7 @@ export function CourierDashboard({
     setActing(null);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      alert(data.error || "خطا");
+      alert(data.error || t("common.error"));
       return;
     }
     location.reload();
@@ -215,17 +199,15 @@ export function CourierDashboard({
 
   const mapCenter = pos ?? TEHRAN_CENTER;
   const onlineLabel = tracking
-    ? "آنلاین (GPS دقیق)"
+    ? t("courier.online_gps_precise")
     : source === "gps" && pos
-    ? "آنلاین (GPS)"
+    ? t("courier.online_gps")
     : source === "ip" && pos
-    ? "آنلاین (تقریبی از IP)"
+    ? t("courier.online_ip")
     : pos
-    ? "آنلاین"
-    : "آفلاین";
+    ? t("courier.online")
+    : t("courier.offline");
 
-  // tick is intentionally read so the JSX re-renders every second and the
-  // "X seconds ago" label stays current.
   void tick;
   const secondsAgo =
     lastUpdatedAt != null ? Math.max(0, Math.floor((Date.now() - lastUpdatedAt) / 1000)) : null;
@@ -234,9 +216,9 @@ export function CourierDashboard({
     <div className="space-y-6">
       <div className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold">پنل پیک</h1>
+          <h1 className="text-xl font-bold">{t("courier.panel")}</h1>
           <p className="text-sm text-gray-500">
-            وضعیت ردیابی:{" "}
+            {t("courier.tracking_status")}:{" "}
             {pos ? (
               <span className="text-green-600">{onlineLabel}</span>
             ) : (
@@ -247,69 +229,65 @@ export function CourierDashboard({
           </p>
           <p className="mt-1 text-xs text-gray-500">
             {secondsAgo == null ? (
-              <span>هنوز به‌روزرسانی نشده</span>
+              <span>{t("courier.not_updated_yet")}</span>
             ) : (
               <span>
-                آخرین به‌روزرسانی: <span className="font-mono">{secondsAgo}</span> ثانیه پیش
+                {t("courier.last_update", { seconds: secondsAgo })}
                 {" — "}
-                تعداد کل: <span className="font-mono">{updateCount}</span>
+                {t("courier.update_count", { count: updateCount })}
                 {accuracy != null && (
                   <>
                     {" — "}
-                    دقت GPS: <span className="font-mono">{Math.round(accuracy)}m</span>
+                    {t("courier.gps_accuracy", { meters: Math.round(accuracy) })}
                   </>
                 )}
               </span>
             )}
           </p>
           {source === "ip" && !tracking && (
-            <p className="mt-1 text-xs text-amber-700">
-              این موقعیت تقریبی از روی IP است (هر ۵ ثانیه refresh می‌شود). برای ردیابی زنده و دقیق روی «روشن کردن GPS» بزنید و در popup مرورگر Allow بزنید.
-            </p>
+            <p className="mt-1 text-xs text-amber-700">{t("courier.ip_fallback_note")}</p>
           )}
           {tracking && (
-            <p className="mt-1 text-xs text-green-700">
-              ردیابی زنده فعال است. هر تغییر موقعیت GPS automatically روی نقشه و سرور به‌روزرسانی می‌شود.
-            </p>
+            <p className="mt-1 text-xs text-green-700">{t("courier.live_tracking_active")}</p>
           )}
         </div>
         <button
           className={tracking ? "btn-outline" : "btn-primary"}
           onClick={toggleTracking}
         >
-          {tracking ? "خاموش کردن GPS" : "روشن کردن GPS"}
+          {tracking ? t("courier.turn_off_gps") : t("courier.turn_on_gps")}
         </button>
       </div>
 
       {error && <div className="card p-3 text-sm text-amber-700">{error}</div>}
 
       <div className="card p-4">
-        <h2 className="mb-2 font-semibold">نقشه</h2>
+        <h2 className="mb-2 font-semibold">{t("courier.map")}</h2>
         <Map
           center={mapCenter}
-          markers={pos ? [{ lat: pos.lat, lng: pos.lng, title: source === "ip" ? "موقعیت تقریبی شما" : "شما" }] : []}
+          markers={pos ? [{ lat: pos.lat, lng: pos.lng, title: source === "ip" ? t("courier.your_approx_position") : t("courier.your_position") }] : []}
           recenter={pos != null}
           height={300}
         />
       </div>
 
       <section>
-        <h2 className="mb-3 text-lg font-bold">سفارش‌های در حال انجام شما</h2>
+        <h2 className="mb-3 text-lg font-bold">{t("courier.my_active_orders")}</h2>
         <div className="space-y-3">
           {mine.map((o) => (
-            <OrderCard key={o.id} order={o} acting={acting} act={act} mine />
+            <OrderCard key={o.id} order={o} acting={acting} act={act} mine t={t} locale={locale} />
           ))}
-          {mine.length === 0 && <div className="card p-4 text-gray-500">سفارش فعالی ندارید.</div>}
+          {mine.length === 0 && <div className="card p-4 text-gray-500">{t("courier.no_active_orders")}</div>}
         </div>
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-bold">سفارش‌های موجود برای پذیرش</h2>
+        <h2 className="mb-3 text-lg font-bold">{t("courier.available_orders")}</h2>
         <div className="space-y-3">
           {available.map((o) => (
-            <OrderCard key={o.id} order={o} acting={acting} act={act} />
+            <OrderCard key={o.id} order={o} acting={acting} act={act} t={t} locale={locale} />
           ))}
-          {available.length === 0 && <div className="card p-4 text-gray-500">سفارشی موجود نیست.</div>}
+          {available.length === 0 && <div className="card p-4 text-gray-500">{t("courier.no_available_orders")}</div>}
         </div>
       </section>
     </div>
@@ -321,31 +299,35 @@ function OrderCard({
   acting,
   act,
   mine,
+  t,
+  locale,
 }: {
   order: OrderLite;
   acting: string | null;
   act: (id: string, a: "accept" | "advance" | "deliver") => void;
   mine?: boolean;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  locale: "en" | "fa";
 }) {
   const next: { label: string; action: "advance" | "deliver" } | null =
     o.status === "ACCEPTED"
-      ? { label: "شروع تهیه", action: "advance" }
+      ? { label: t("courier.start_preparing"), action: "advance" }
       : o.status === "PREPARING"
-      ? { label: "در راه (شروع حرکت)", action: "advance" }
+      ? { label: t("courier.on_the_way_action"), action: "advance" }
       : o.status === "ON_THE_WAY"
-      ? { label: "تحویل شد", action: "deliver" }
+      ? { label: t("courier.delivered_action"), action: "deliver" }
       : null;
 
   return (
     <div className="card p-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="font-medium">{o.restaurant?.name || "خرید سوپرمارکت"}</div>
+          <div className="font-medium">{o.restaurant?.name || t("courier.supermarket_pickup")}</div>
           <div className="text-xs text-gray-500">{o.address?.fullText}</div>
         </div>
         <div className="text-left">
-          <div className="text-xs text-gray-500">حق سرویس پیک</div>
-          <div className="font-bold">{formatToman(o.courierFee)}</div>
+          <div className="text-xs text-gray-500">{t("courier.courier_service_fee")}</div>
+          <div className="font-bold">{formatToman(o.courierFee, locale)}</div>
         </div>
       </div>
       <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600">
@@ -354,7 +336,7 @@ function OrderCard({
         ))}
       </div>
       <div className="mt-3 flex items-center justify-between">
-        <span className="badge bg-brand-50 text-brand-700">{ORDER_STATUS_FA[o.status as OrderStatus]}</span>
+        <span className="badge bg-brand-50 text-brand-700">{t(ORDER_STATUS_KEY[o.status as OrderStatus])}</span>
         <div className="flex gap-2">
           {!mine && (
             <button
@@ -362,7 +344,7 @@ function OrderCard({
               onClick={() => act(o.id, "accept")}
               disabled={acting === o.id + ":accept"}
             >
-              قبول سفارش
+              {t("courier.accept_order")}
             </button>
           )}
           {mine && next && (

@@ -1,5 +1,10 @@
-export function formatToman(value: number): string {
-  return new Intl.NumberFormat("fa-IR").format(value) + " تومان";
+import type { Locale } from "@/i18n/messages";
+
+export function formatToman(value: number, locale: Locale = "fa"): string {
+  if (locale === "fa") {
+    return new Intl.NumberFormat("fa-IR").format(value) + " تومان";
+  }
+  return new Intl.NumberFormat("en-US").format(value) + " Toman";
 }
 
 export function calcOrderTotals(opts: {

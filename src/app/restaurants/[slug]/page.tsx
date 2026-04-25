@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatToman } from "@/lib/money";
 import { AddToCartButton } from "@/components/AddToCartButton";
+import { getT } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function RestaurantPage({ params }: { params: { slug: string } }) {
+  const { t, locale } = getT();
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug: params.slug },
     include: {
@@ -37,7 +39,7 @@ export default async function RestaurantPage({ params }: { params: { slug: strin
       </div>
 
       <div>
-        <h2 className="mb-4 text-xl font-bold">منو</h2>
+        <h2 className="mb-4 text-xl font-bold">{t("restaurants.menu")}</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {restaurant.menu.map((item) => (
             <div key={item.id} className="card flex gap-4 overflow-hidden p-3">
@@ -52,7 +54,7 @@ export default async function RestaurantPage({ params }: { params: { slug: strin
                   <div className="text-sm text-gray-500 line-clamp-2">{item.description}</div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="font-semibold text-brand-700">{formatToman(item.price)}</span>
+                  <span className="font-semibold text-brand-700">{formatToman(item.price, locale)}</span>
                   <AddToCartButton
                     item={{
                       id: item.id,
@@ -67,7 +69,7 @@ export default async function RestaurantPage({ params }: { params: { slug: strin
               </div>
             </div>
           ))}
-          {restaurant.menu.length === 0 && <div className="col-span-full text-gray-500">منویی ثبت نشده.</div>}
+          {restaurant.menu.length === 0 && <div className="col-span-full text-gray-500">{t("restaurants.no_menu")}</div>}
         </div>
       </div>
     </div>

@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLocale } from "@/i18n/client";
+import { formatToman } from "@/lib/money";
 
 type Promotion = { id: string; code: string; percentOff: number | null; amountOff: number | null; isActive: boolean };
 type Festival = {
@@ -17,6 +19,8 @@ type Festival = {
 
 export function FestivalsEditor({ festivals }: { festivals: Festival[] }) {
   const router = useRouter();
+  const { t, locale } = useLocale();
+  const dateLocale = locale === "fa" ? "fa-IR" : "en-US";
   const [form, setForm] = useState({
     title: "",
     slug: "",
@@ -61,13 +65,13 @@ export function FestivalsEditor({ festivals }: { festivals: Festival[] }) {
   }
 
   async function removePromo(id: string) {
-    if (!confirm("حذف شود؟")) return;
+    if (!confirm(t("common.confirm_delete"))) return;
     await fetch(`/api/admin/promotions/${id}`, { method: "DELETE" });
     router.refresh();
   }
 
   async function removeFestival(id: string) {
-    if (!confirm("حذف شود؟")) return;
+    if (!confirm(t("common.confirm_delete"))) return;
     await fetch(`/api/admin/festivals/${id}`, { method: "DELETE" });
     router.refresh();
   }
@@ -75,14 +79,14 @@ export function FestivalsEditor({ festivals }: { festivals: Festival[] }) {
   return (
     <div className="space-y-4">
       <div className="card p-4">
-        <h2 className="mb-3 font-semibold">جشنواره جدید</h2>
+        <h2 className="mb-3 font-semibold">{t("admin.new_festival")}</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <input className="input" placeholder="عنوان" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          <input className="input" placeholder="slug (مثلا nowruz)" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
-          <input className="input" placeholder="توضیحات" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <input className="input" placeholder={t("admin.festival_title")} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+          <input className="input" placeholder={t("admin.festival_slug")} value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
+          <input className="input" placeholder={t("common.description")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <input className="input" type="date" value={form.startsAt} onChange={(e) => setForm({ ...form, startsAt: e.target.value })} />
           <input className="input" type="date" value={form.endsAt} onChange={(e) => setForm({ ...form, endsAt: e.target.value })} />
-          <button className="btn-primary" onClick={addFestival} disabled={busy}>افزودن</button>
+          <button className="btn-primary" onClick={addFestival} disabled={busy}>{t("common.add")}</button>
         </div>
       </div>
 
@@ -92,34 +96,43 @@ export function FestivalsEditor({ festivals }: { festivals: Festival[] }) {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-lg font-bold">{f.title}</div>
-                <div className="text-xs text-gray-500">/{f.slug} — {new Date(f.startsAt).toLocaleDateString("fa-IR")} تا {new Date(f.endsAt).toLocaleDateString("fa-IR")}</div>
+                <div className="text-xs text-gray-500">
+                  /{f.slug} — {t("festivals.range", {
+                    start: new Date(f.startsAt).toLocaleDateString(dateLocale),
+                    end: new Date(f.endsAt).toLocaleDateString(dateLocale),
+                  })}
+                </div>
               </div>
-              <button className="text-xs text-red-600 hover:underline" onClick={() => removeFestival(f.id)}>حذف جشنواره</button>
+              <button className="text-xs text-red-600 hover:underline" onClick={() => removeFestival(f.id)}>{t("admin.delete_festival")}</button>
             </div>
 
             <div className="mt-3 space-y-2">
-              <h3 className="text-sm font-semibold">کدهای تخفیف</h3>
+              <h3 className="text-sm font-semibold">{t("admin.promo_codes")}</h3>
               {f.promotions.map((p) => (
                 <div key={p.id} className="flex items-center justify-between rounded border p-2 text-sm">
                   <span className="font-mono">{p.code}</span>
                   <span>
-                    {p.percentOff ? `${p.percentOff}٪` : p.amountOff ? `${p.amountOff} تومان` : "-"}
+                    {p.percentOff
+                      ? `${p.percentOff}%`
+                      : p.amountOff
+                      ? formatToman(p.amountOff, locale)
+                      : "-"}
                   </span>
-                  <button className="text-xs text-red-600 hover:underline" onClick={() => removePromo(p.id)}>حذف</button>
+                  <button className="text-xs text-red-600 hover:underline" onClick={() => removePromo(p.id)}>{t("common.delete")}</button>
                 </div>
               ))}
 
               <div className="grid grid-cols-1 gap-2 pt-2 sm:grid-cols-5">
-                <input className="input" placeholder="کد" value={promo[f.id]?.code || ""} onChange={(e) => setPromo({ ...promo, [f.id]: { ...(promo[f.id] || { code: "", percentOff: "", amountOff: "", minOrderTotal: "" }), code: e.target.value } })} />
-                <input className="input" type="number" placeholder="درصد تخفیف" value={promo[f.id]?.percentOff || ""} onChange={(e) => setPromo({ ...promo, [f.id]: { ...(promo[f.id] || { code: "", percentOff: "", amountOff: "", minOrderTotal: "" }), percentOff: e.target.value } })} />
-                <input className="input" type="number" placeholder="مبلغ تخفیف" value={promo[f.id]?.amountOff || ""} onChange={(e) => setPromo({ ...promo, [f.id]: { ...(promo[f.id] || { code: "", percentOff: "", amountOff: "", minOrderTotal: "" }), amountOff: e.target.value } })} />
-                <input className="input" type="number" placeholder="حداقل سفارش" value={promo[f.id]?.minOrderTotal || ""} onChange={(e) => setPromo({ ...promo, [f.id]: { ...(promo[f.id] || { code: "", percentOff: "", amountOff: "", minOrderTotal: "" }), minOrderTotal: e.target.value } })} />
-                <button className="btn-primary" onClick={() => addPromo(f.id)}>افزودن کد</button>
+                <input className="input" placeholder={t("admin.promo_code_placeholder")} value={promo[f.id]?.code || ""} onChange={(e) => setPromo({ ...promo, [f.id]: { ...(promo[f.id] || { code: "", percentOff: "", amountOff: "", minOrderTotal: "" }), code: e.target.value } })} />
+                <input className="input" type="number" placeholder={t("admin.promo_percent_off")} value={promo[f.id]?.percentOff || ""} onChange={(e) => setPromo({ ...promo, [f.id]: { ...(promo[f.id] || { code: "", percentOff: "", amountOff: "", minOrderTotal: "" }), percentOff: e.target.value } })} />
+                <input className="input" type="number" placeholder={t("admin.promo_amount_off")} value={promo[f.id]?.amountOff || ""} onChange={(e) => setPromo({ ...promo, [f.id]: { ...(promo[f.id] || { code: "", percentOff: "", amountOff: "", minOrderTotal: "" }), amountOff: e.target.value } })} />
+                <input className="input" type="number" placeholder={t("admin.promo_min_order")} value={promo[f.id]?.minOrderTotal || ""} onChange={(e) => setPromo({ ...promo, [f.id]: { ...(promo[f.id] || { code: "", percentOff: "", amountOff: "", minOrderTotal: "" }), minOrderTotal: e.target.value } })} />
+                <button className="btn-primary" onClick={() => addPromo(f.id)}>{t("admin.add_promo")}</button>
               </div>
             </div>
           </div>
         ))}
-        {festivals.length === 0 && <div className="card p-6 text-gray-500">جشنواره‌ای ثبت نشده.</div>}
+        {festivals.length === 0 && <div className="card p-6 text-gray-500">{t("admin.no_festivals")}</div>}
       </div>
     </div>
   );

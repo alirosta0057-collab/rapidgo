@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useT } from "@/i18n/client";
 
 export default function RestaurantSetupPage() {
   const router = useRouter();
+  const t = useT();
   const [form, setForm] = useState({
     name: "",
     slug: "",
@@ -18,7 +20,7 @@ export default function RestaurantSetupPage() {
   async function submit() {
     setError(null);
     if (!form.name || !form.slug || !form.address) {
-      setError("نام، اسلاگ و آدرس الزامی است.");
+      setError(t("restaurant_panel.name_slug_address_required"));
       return;
     }
     setBusy(true);
@@ -30,7 +32,7 @@ export default function RestaurantSetupPage() {
     setBusy(false);
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error || "خطا");
+      setError(data.error || t("common.error"));
       return;
     }
     router.push(`/restaurant`);
@@ -38,18 +40,18 @@ export default function RestaurantSetupPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
-      <h1 className="text-2xl font-bold">ثبت رستوران</h1>
+      <h1 className="text-2xl font-bold">{t("restaurant_panel.setup_title")}</h1>
       <div className="card space-y-3 p-4">
-        <input className="input" placeholder="نام رستوران" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <input className="input" placeholder="slug (آدرس URL)" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
-        <textarea className="input" placeholder="توضیحات" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-        <input className="input" placeholder="آدرس" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-        <input className="input" placeholder="شماره تماس" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        <input className="input" placeholder={t("restaurant_panel.name_placeholder")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <input className="input" placeholder={t("restaurant_panel.slug_placeholder")} value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
+        <textarea className="input" placeholder={t("restaurant_panel.description_placeholder")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        <input className="input" placeholder={t("restaurant_panel.address_placeholder")} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        <input className="input" placeholder={t("restaurant_panel.phone_placeholder")} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         {error && <div className="text-sm text-red-600">{error}</div>}
         <button className="btn-primary w-full" onClick={submit} disabled={busy}>
-          {busy ? "..." : "ثبت رستوران"}
+          {busy ? "..." : t("restaurant_panel.submit")}
         </button>
-        <p className="text-xs text-gray-500">پس از تایید توسط ادمین، رستوران در سایت نمایش داده می‌شود.</p>
+        <p className="text-xs text-gray-500">{t("restaurant_panel.after_approval_note")}</p>
       </div>
     </div>
   );
