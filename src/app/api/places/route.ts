@@ -69,8 +69,13 @@ async function runOverpass(query: string, signal: AbortSignal): Promise<Overpass
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const lat = Number(url.searchParams.get("lat"));
-  const lng = Number(url.searchParams.get("lng"));
+  const latRaw = url.searchParams.get("lat");
+  const lngRaw = url.searchParams.get("lng");
+  if (latRaw === null || lngRaw === null) {
+    return NextResponse.json({ errorCode: "invalid_coords" }, { status: 400 });
+  }
+  const lat = Number(latRaw);
+  const lng = Number(lngRaw);
   const radiusM = Number(url.searchParams.get("radius") || 2000);
   const kind = (url.searchParams.get("kind") || "food") as PlaceKind;
 
