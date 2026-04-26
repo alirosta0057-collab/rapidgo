@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     const { secureUrl, publicId } = await uploadToCloudinary(file, "rapidgo");
     return NextResponse.json({ url: secureUrl, publicId });
   } catch (err) {
-    const code = err instanceof Error ? err.message : "upload_failed";
-    return NextResponse.json({ errorCode: code }, { status: 500 });
+    console.error("cloudinary upload failed", err);
+    return NextResponse.json({ errorCode: "upload_failed" }, { status: 500 });
   }
 }

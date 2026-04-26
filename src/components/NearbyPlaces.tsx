@@ -55,7 +55,9 @@ export function NearbyPlaces() {
         }
         const d = await r.json();
         if (cancelled) return;
-        setOrigin({ lat: d.lat, lng: d.lng, source: "ip", city: d.city });
+        setOrigin((prev) =>
+          prev?.source === "gps" ? prev : { lat: d.lat, lng: d.lng, source: "ip", city: d.city }
+        );
       } catch {
         if (!cancelled) setOriginError("geo_unavailable");
       }
