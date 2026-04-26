@@ -15,14 +15,14 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input." }, { status: 400 });
+    return NextResponse.json({ errorCode: "invalid_input" }, { status: 400 });
   }
   const data = parsed.data;
   const email = data.email.toLowerCase();
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    return NextResponse.json({ error: "This email is already registered." }, { status: 409 });
+    return NextResponse.json({ errorCode: "email_exists" }, { status: 409 });
   }
 
   const passwordHash = await bcrypt.hash(data.password, 10);
