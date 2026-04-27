@@ -13,6 +13,7 @@ export function MenuEditor({ restaurantId, initial }: { restaurantId: string; in
   const [form, setForm] = useState({ name: "", price: 0, description: "", imageUrl: "" });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   async function add() {
     if (!form.name || form.price <= 0) return;
@@ -29,14 +30,19 @@ export function MenuEditor({ restaurantId, initial }: { restaurantId: string; in
 
   async function uploadFile(file: File) {
     setUploading(true);
+    setUploadError(null);
     try {
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/uploads", { method: "POST", body: fd });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok && data.url) {
         setForm((f) => ({ ...f, imageUrl: data.url }));
+      } else {
+        setUploadError(t("menu_editor.image_upload_failed"));
       }
+    } catch {
+      setUploadError(t("menu_editor.image_upload_failed"));
     } finally {
       setUploading(false);
     }
@@ -65,18 +71,25 @@ export function MenuEditor({ restaurantId, initial }: { restaurantId: string; in
         <input className="input sm:col-span-2" placeholder={t("menu_editor.description")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
         <input className="input sm:col-span-2" placeholder={t("menu_editor.image_url_optional")} value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} />
         <label className="btn-outline cursor-pointer text-center sm:col-span-2">
-          {uploading ? t("common.loading") : t("menu_editor.image_upload")}
+          {uploading ? t("menu_editor.image_uploading") : t("menu_editor.image_upload_button")}
           <input
             type="file"
             accept="image/*"
             capture="environment"
             className="hidden"
+            disabled={uploading}
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) uploadFile(f);
+              e.target.value = "";
             }}
           />
         </label>
+        {uploadError && <div className="text-sm text-red-600 sm:col-span-2">{uploadError}</div>}
+        {form.imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={form.imageUrl} alt="" className="h-24 w-24 rounded object-cover sm:col-span-2" />
+        )}
         <button className="btn-primary sm:col-span-2" onClick={add} disabled={busy}>{t("menu_editor.add_item")}</button>
       </div>
 

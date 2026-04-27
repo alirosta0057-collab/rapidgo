@@ -40,7 +40,14 @@ function RegisterForm() {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setLoading(false);
-      setError(data.error || t("auth.register_error"));
+      const code = data.errorCode as string | undefined;
+      const msg =
+        code === "email_exists"
+          ? t("api.email_already_used")
+          : code === "invalid_input"
+          ? t("api.invalid_input")
+          : t("auth.register_error");
+      setError(msg);
       return;
     }
     const signInRes = await signIn("credentials", { redirect: false, email, password });

@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { getT } from "@/i18n/server";
+import { NearbyPlaces } from "@/components/NearbyPlaces";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,8 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      <NearbyPlaces />
 
       <section>
         <div className="mb-4 flex items-center justify-between">
