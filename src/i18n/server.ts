@@ -14,9 +14,13 @@ const FA_COUNTRIES = new Set(["IR"]);
  * Server-side locale resolver.
  *
  * Resolution order:
- *  1. `locale` cookie (set by LocaleSwitcher).
- *  2. Vercel edge geo header `x-vercel-ip-country` — IR -> fa.
- *  3. `accept-language` header — `fa*` -> fa.
+ *  1. `locale` cookie (set by LocaleSwitcher) — explicit user choice always wins.
+ *  2. Vercel edge geo header `x-vercel-ip-country` — when present, country is
+ *     authoritative: IR -> fa, anything else -> DEFAULT_LOCALE.
+ *     We do NOT fall through to accept-language in this case, otherwise a
+ *     Persian-language browser in (e.g.) Turkey would incorrectly get fa.
+ *  3. `accept-language` header — only used when no country header is present
+ *     (e.g. local dev). `fa*` -> fa.
  *  4. DEFAULT_LOCALE (en).
  */
 export function getLocale(): Locale {
@@ -25,7 +29,9 @@ export function getLocale(): Locale {
 
   const h = headers();
   const country = h.get("x-vercel-ip-country");
-  if (country && FA_COUNTRIES.has(country.toUpperCase())) return "fa";
+  if (country) {
+    return FA_COUNTRIES.has(country.toUpperCase()) ? "fa" : DEFAULT_LOCALE;
+  }
 
   const al = h.get("accept-language");
   if (al && /\bfa\b/i.test(al)) return "fa";
